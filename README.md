@@ -123,7 +123,9 @@ Skyrim=12345.67,12
  
 - **Can I execute games that require 'Run as Administrator' through NSGTT?**
   - Sadly, nope.
- 
+    
+ - **There are no notes in the 2371090\remote\ folder. Why?**
+   - Just create a placeholder note on your steam shortcut page and save it. It should appear there.
 ---
 
 ## 🧠 License
