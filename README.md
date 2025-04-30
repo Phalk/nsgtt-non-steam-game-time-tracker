@@ -86,7 +86,7 @@ C:\Program Files (x86)\Steam\userdata\[YOUR STEAM ID]\2371090\remote\
 
 > ⚠️ **VERY IMPORTANT:**  
 > 
-> - **You MUST restart Steam** after creating or modifying a Steam Note externally. Steam caches notes, and changes won't show immediately!
+> - **You must restart Steam** after creating or modifying a Steam Note externally. Steam caches notes, and changes won't show immediately! (Entering Big Picture mode also reloads the notes).
 > - **The tool always edits ONLY the first note** of the note file.
 > - **If you have written something manually in that first note, it WILL be replaced**.
 
