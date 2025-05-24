@@ -47,7 +47,7 @@
        "STEAM_PATH": "C:\\Program Files (x86)\\Steam",
        "NOTES_APPID": "2371090",
        "CHECK_INTERVAL": 5,
-       "USERDATA_ID": "54808062",
+       "USERDATA_ID": "00000000",
        "DEBUG": false
    }
    ```
