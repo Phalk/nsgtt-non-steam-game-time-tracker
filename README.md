@@ -1,185 +1,177 @@
-# NSGTT - Non Steam Game Time Tracker
+# Non-Steam Game Time Tracker (NSGTT) Daemon
 
-**NSGTT** is a lightweight tool that tracks playtime for non-Steam games and optionally updates Steam Notes for seamless integration with your Steam Library.
+**NSGTT** is a Python daemon that tracks playtime for non-Steam games added as shortcuts in Steam. It monitors running processes, logs playtime to a SQLite database, and updates Steam notes with session details (last played, total time, and play count).
 
-This script monitors the execution of any game executable, records your playtime and number of launches in a SQLite database, and updates a formatted Steam Note if configured.
+## Features
+- **Process Monitoring**: Detects when non-Steam games (listed in `shortcuts.vdf`) start and stop, tracking their runtime.
+- **Database Storage**: Saves total playtime and play count per game in a SQLite database (`nsgtt.db`).
+- **Steam Note Integration**: Updates Steam notes in the specified `NOTES_APPID` directory with formatted session info.
+- **Minimal Console Output**: Clears the console and updates a single status line ("Monitoring...") to reduce clutter, with key events (start/stop tracking) displayed prominently.
+- **Debug Mode**: Toggle verbose logging via `DEBUG` in `config.json` for troubleshooting.
+- **Robust Error Handling**: Continues monitoring even if errors occur during process termination or file operations.
+- **Efficient File Handling**: Caches `shortcuts.vdf` and reloads only when modified, minimizing file I/O.
 
----
+## Requirements
+- **Python 3.8+**
+- **Dependencies** (install via `pip`):
+  ```bash
+  pip install psutil colorama vdf
+  ```
+- **Windows OS** (uses `os.system('cls')` for console clearing; adaptable for other OSes).
+- **Steam Installed**: Requires a valid Steam installation with non-Steam games added as shortcuts.
+- **Write Permissions**: Needs write access to the Steam `userdata` directory and the NSGTT directory for the database and notes.
 
-## 📜 Features
+## Installation
+1. **Clone or Download**:
+   ```bash
+   git clone https://github.com/yourusername/nsgtt.git
+   cd nsgtt
+   ```
+   Or download and extract the ZIP file.
 
-- 🕒 Tracks total time played for any executable.
-- 🔁 Counts how many times you've launched the game.
-- 📊 Displays playtime statistics for all tracked games.
-- 📄 Updates a **Steam Note** (for non-Steam games!) with:
-  - Last played date and time
-  - Total playtime
-  - Number of times launched
-- 💾 Saves playtime data locally in a SQLite database (`nsgtt.db`).
-- ⚙️ Configurable Steam path and Notes AppID via `config.json`.
+2. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+   Create `requirements.txt` with:
+   ```
+   psutil
+   colorama
+   vdf
+   ```
 
----
+3. **Configure**:
+   Create `config.json` in the NSGTT directory:
+   ```json
+   {
+       "STEAM_PATH": "C:\\Program Files (x86)\\Steam",
+       "NOTES_APPID": "2371090",
+       "CHECK_INTERVAL": 5,
+       "USERDATA_ID": "54808062",
+       "DEBUG": false
+   }
+   ```
+   - `STEAM_PATH`: Path to your Steam installation.
+   - `NOTES_APPID`: Steam AppID for note storage (default: `2371090`).
+   - `CHECK_INTERVAL`: Seconds between process checks (default: `5`).
+   - `USERDATA_ID`: Steam userdata folder ID (e.g., `54808062`). If `null`, uses the first valid folder.
+   - `DEBUG`: Set to `true` for verbose logging, `false` for minimal output.
 
-## 🚀 How to Use
+4. **Add Non-Steam Games to Steam**:
+   - In Steam, go to Library > Add a Game > Add a Non-Steam Game.
+   - Select the game's executable (e.g., `Cuphead.exe`).
+   - Ensure the game appears in `shortcuts.vdf` (located at `STEAM_PATH/userdata/USERDATA_ID/config/shortcuts.vdf`).
 
-### 1. Basic Usage (Tracking a Game)
+## Usage
+1. **Run the Daemon**:
+   ```bash
+   python nsgtt_daemon.py
+   ```
+   - The script initializes the database (`nsgtt.db`), detects the userdata ID, and starts monitoring.
+   - Console output:
+     - Startup: Shows database initialization and userdata ID.
+     - Game Start: "Started tracking [Game] (PID: X, Time: HH:MM:SS, Count: Y)".
+     - Game Stop: "Stopped tracking [Game] (PID: X, Session: HH:MM:SS, Total: HH:MM:SS, Count: Y)".
+     - Monitoring: Updates "Monitoring... (X processes tracked, iteration Y)" in place.
+     - Errors: Displays any issues (e.g., database or file access errors).
 
-```bash
-nsgtt.exe --run "path\to\your\game.exe"
-```
+2. **View Statistics**:
+   ```bash
+   python nsgtt_daemon.py --show
+   ```
+   - Displays a table of all tracked games with total playtime and play count.
 
-Example:
+3. **Stop the Daemon**:
+   - Press `Ctrl+C` to stop monitoring. The console will show "Monitor stopped by user."
 
-```bash
-nsgtt.exe --run "C:\Games\Metaphor\Metaphor.exe"
-```
+## Console Output
+With `DEBUG: false`, the console is kept clean:
+- **Startup**:
+  ```
+  ===== [ NSGTT - Non Steam Game Time Tracker Daemon ] =====
+  Initializing database at: E:\Arquivos\Ferramentas\NSGTT\nsgtt.db
+  Database initialized successfully.
+  Using USERDATA_ID from config: 54808062
+  Starting process monitor...
+  ```
+- **Game Starts**:
+  ```
+  Started tracking Cuphead (PID: 16660, Time: 00:02:01, Count: 2)
+  ```
+- **Game Stops**:
+  ```
+  Stopped tracking Cuphead (PID: 16660, Session: 00:00:10, Total: 00:02:11, Count: 3)
+  ```
+- **Monitoring**:
+  ```
+  Monitoring... (0 processes tracked, iteration 12)
+  ```
+- **Shortcuts Reload**:
+  ```
+  Reloading shortcuts.vdf (modified at Sat May 24 00:15:00 2025)
+  ```
 
-The game will launch, and the timer will track how long it stays open. Playtime and launch count are saved in `nsgtt.db`.
+With `DEBUG: true`, additional verbose messages appear (e.g., "Retrieving data for game: Cuphead").
 
-### 2. View Statistics
+## Database
+- **Location**: `nsgtt.db` in the NSGTT directory.
+- **Schema**:
+  ```sql
+  CREATE TABLE game_time (
+      game_name TEXT PRIMARY KEY,
+      time_played REAL,
+      play_count INTEGER
+  );
+  ```
+- Stores each game's name, total playtime (seconds), and play count.
 
-To see playtime statistics for all tracked games:
+## Steam Notes
+- **Location**: `STEAM_PATH/userdata/USERDATA_ID/NOTES_APPID/remote/notes_shortcut_[GameName]`.
+- **Format**: JSON with a single note per game:
+  ```json
+  {
+      "notes": [
+          {
+              "title": "Last session: 2025-05-24 00:12 || Time played: 00:02:11 (played 3 times)",
+              "content": "\n📅 Last played: 2025-05-24 00:12\n⏱️ Recorded time: 00:02:11\n🔢 Times played: 3\n",
+              "time_modified": 1748212320
+          }
+      ]
+  }
+  ```
 
-```bash
-nsgtt.exe
-```
+## Troubleshooting
+- **Crash on Game Termination**:
+  - Ensure `DEBUG: true` in `config.json` and check for error messages.
+  - Verify write permissions for `nsgtt.db` and the Steam `remote` directory.
+- **No Games Detected**:
+  - Confirm games are added as non-Steam shortcuts in Steam.
+  - Check `shortcuts.vdf` for correct executable paths.
+- **Steam Note Not Updating**:
+  - Verify `NOTES_APPID` and `USERDATA_ID` in `config.json`.
+  - Run as administrator if permission errors occur:
+    ```bash
+    python nsgtt_daemon.py
+    ```
+- **Console Clutter**:
+  - Ensure `DEBUG: false` for minimal output.
+  - Confirm you're on Windows (uses `cls` for clearing).
 
-Output example:
+## Changelog (v2.0)
+Compared to the original version:
+- **Fixed Crash on Termination**: Robust exception handling ensures the monitoring loop continues after process termination.
+- **Optimized `shortcuts.vdf` Loading**: Caches file and reloads only when modified, reducing I/O and console spam.
+- **Improved Steam Note Handling**: Creates `remote` directory proactively and logs errors.
+- **Reduced Console Clutter**: Clears console with `cls` and updates status in place with `\r`.
+- **Added Debug Toggle**: `DEBUG` flag in `config.json` controls verbose output.
+- **Enhanced UX**: Color-coded, minimal output with clear event messages.
 
-```
-Game Statistics:
-+----------------------+--------------+-------------+
-| Game Name            | Time Played  | Play Count  |
-+----------------------+--------------+-------------+
-| Metaphor - ReFantazio | 00:01:34     | 1           |
-| Cuphead              | 00:05:12     | 3           |
-+----------------------+--------------+-------------+
-```
+## Contributing
+- Fork the repository and submit pull requests for bug fixes or features.
+- Report issues via GitHub Issues, including console output with `DEBUG: true`.
 
----
+## License
+MIT License. See `LICENSE` for details.
 
-## 3. Adding NSGTT to Steam (Shortcut Integration)
-
-Integrate NSGTT with Steam to track non-Steam games directly from your Library!
-
-### Steps:
-
-1. In Steam, click **Add a Non-Steam Game**.
-2. Choose any `.exe` file (you'll edit it soon).
-3. Right-click the new shortcut → **Properties**.
-4. In the **Target** field, replace it with:
-
-```plaintext
-"full_path_to_nsgtt.exe" --run "full_path_to_game.exe"
-```
-
-Example:
-
-```plaintext
-"E:\Arquivos\Ferramentas\NSGTT\nsgtt.exe" --run "C:\Games\Metaphor\Metaphor.exe"
-```
-
-5. Rename the shortcut to the real game name (ex.: `Metaphor - ReFantazio`).
-6. (Optional) Set a custom icon and grab art assets at [SteamGridDB](https://www.steamgriddb.com/).
-
-Now, launching the game from Steam will run NSGTT, track playtime, and update Steam Notes (if configured).
-
-### 4. Auto Adding NSGTT to all your Non Steam Games
-
-1. Open NGSTT.exe with --install parameter. (You can remove it with --uninstall)
-
-### 5. Steam Notes
-
-![image](https://github.com/user-attachments/assets/a4339846-12e1-493d-9396-4d04129db51f)
-
-NSGTT automatically updates Steam Notes if the game is added as a non-Steam game. The note file is created in:
-
-```
-C:\Program Files (x86)\Steam\userdata\[YOUR_STEAM_ID]\2371090\remote\notes_shortcut_[GAME_NAME]
-```
-
-Example for `Metaphor - ReFantazio`:
-
-```
-C:\Program Files (x86)\Steam\userdata\54808062\2371090\remote\notes_shortcut_Metaphor___ReFantazio
-```
-
-The note file is created automatically when you run the game via NSGTT. The note includes:
-
-- Last played date/time
-- Total playtime
-- Number of launches
-
-> ⚠️ **VERY IMPORTANT:**
->
-> - **You must restart Steam** or enter **Big Picture mode** after NSGTT updates a note, as Steam caches notes.
-> - NSGTT **only edits the first note** in the note file.
-> - Manual changes to the first note will be **overwritten** by NSGTT.
-> - If no note file exists, create a placeholder note in Steam for the game to initialize the file.
-
-### 5. Configuration (Optional)
-
-Create a `config.json` file in the same directory as `nsgtt.exe` to customize settings:
-
-```json
-{
-    "STEAM_PATH": "C:\\Program Files (x86)\\Steam",
-    "NOTES_APPID": "2371090"
-}
-```
-
-If not provided, default values are used.
-
----
-
-## 📂 Files
-
-- `nsgtt.exe` → Main executable (built with Python and PyInstaller).
-- `nsgtt.db` → SQLite database automatically created, storing:
-  - Game name
-  - Total playtime (in seconds)
-  - Number of launches
-- `config.json` → Optional configuration file for Steam path and Notes AppID.
-
-Example `nsgtt.db` content (viewed with SQLite browser):
-
-```
-game_name              | time_played | play_count
------------------------|-------------|------------
-Metaphor - ReFantazio  | 94.0        | 1
-Cuphead               | 312.0       | 3
-```
-
----
-
-## ❓ FAQ
-
-- **Will this interfere with my games or Steam?**
-  - No. It only monitors processes and edits note files.
-
-- **If I force-close the game, will time still be recorded?**
-  - Yes, playtime is saved based on the process lifetime.
-
-- **Does it support tracking multiple games?**
-  - Yes, each game is tracked separately in `nsgtt.db`.
-
-- **Can I edit multiple notes at once?**
-  - No, only the first note in the note file is edited.
-
-- **Can I execute games that require 'Run as Administrator' through NSGTT?**
-  - No, NSGTT does not support running games as administrator.
-
-- **There are no notes in the 2371090\remote\ folder. Why?**
-  - Create a placeholder note in Steam for the game and save it. The file will appear in the `remote` folder.
-
-- **Why don't I see updated notes in Steam?**
-  - Restart Steam or enter Big Picture mode to refresh the note cache.
-
----
-
-## 🧠 License
-
-This project is open-source and free for personal use.  
-Contributions and suggestions are welcome! 🎮
-
----
+## Credits
+Developed by [Your Name]. Inspired by the need to track non-Steam game playtime seamlessly within Steam.
