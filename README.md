@@ -84,7 +84,11 @@ Example:
 
 Now, launching the game from Steam will run NSGTT, track playtime, and update Steam Notes (if configured).
 
-### 4. Auto Updating a Steam Note
+### 4. Auto Adding NSGTT to all your Non Steam Games
+
+1. Open NGSTT.exe with --install parameter. (You can remove it with --uninstall)
+
+### 5. Steam Notes
 
 ![image](https://github.com/user-attachments/assets/a4339846-12e1-493d-9396-4d04129db51f)
 
