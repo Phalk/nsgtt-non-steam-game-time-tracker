@@ -174,4 +174,4 @@ Compared to the original version:
 MIT License. See `LICENSE` for details.
 
 ## Credits
-Developed by [Your Name]. Inspired by the need to track non-Steam game playtime seamlessly within Steam.
+Developed by Phalk. Inspired by the need to track non-Steam game playtime seamlessly within Steam.
