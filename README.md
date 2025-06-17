@@ -1,6 +1,6 @@
 # Non-Steam Game Time Tracker (NSGTT) Daemon
 
-**NSGTT** is a Python daemon that tracks playtime for non-Steam games added as shortcuts in Steam. It monitors running processes, logs playtime to a SQLite database, and updates Steam notes with session details (last played, total time, and play count).
+**NSGTT** is a Python script that tracks playtime for non-Steam games added as shortcuts in Steam. It monitors running processes, logs playtime to a SQLite database, and updates Steam notes with session details (last played, total time, and play count).
 
 ## Features
 - **Process Monitoring**: Detects when non-Steam games (listed in `shortcuts.vdf`) start and stop, tracking their runtime.
