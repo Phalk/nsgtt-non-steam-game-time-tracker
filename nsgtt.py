@@ -333,8 +333,8 @@ def monitor_processes(userdata_id):
                     continue
 
             # Update status
-            os.system('cls')
-            print(f"{Fore.CYAN}Monitoring... ({len(tracked_processes)} processes tracked, iteration {loop_count}){Style.RESET_ALL}", end='\r')
+            #os.system('cls')
+            #print(f"{Fore.CYAN}Monitoring... ({len(tracked_processes)} processes tracked, iteration {loop_count}){Style.RESET_ALL}", end='\r')
             time.sleep(CHECK_INTERVAL)
         except KeyboardInterrupt:
             os.system('cls')
