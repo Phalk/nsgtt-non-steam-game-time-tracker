@@ -1,4 +1,4 @@
-# Non-Steam Game Time Tracker (NSGTT) Daemon
+# Non-Steam Game Time Tracker (NSGTT)
 
 **NSGTT** is a Python script that tracks playtime for non-Steam games added as shortcuts in Steam. It monitors running processes, logs playtime to a SQLite database, and updates Steam notes with session details (last played, total time, and play count).
 
@@ -6,7 +6,6 @@
 - **Process Monitoring**: Detects when non-Steam games (listed in `shortcuts.vdf`) start and stop, tracking their runtime.
 - **Database Storage**: Saves total playtime and play count per game in a SQLite database (`nsgtt.db`).
 - **Steam Note Integration**: Updates Steam notes in the specified `NOTES_APPID` directory with formatted session info.
-- **Minimal Console Output**: Clears the console and updates a single status line ("Monitoring...") to reduce clutter, with key events (start/stop tracking) displayed prominently.
 - **Debug Mode**: Toggle verbose logging via `DEBUG` in `config.json` for troubleshooting.
 - **Robust Error Handling**: Continues monitoring even if errors occur during process termination or file operations.
 - **Efficient File Handling**: Caches `shortcuts.vdf` and reloads only when modified, minimizing file I/O.
@@ -63,9 +62,9 @@
    - Ensure the game appears in `shortcuts.vdf` (located at `STEAM_PATH/userdata/USERDATA_ID/config/shortcuts.vdf`).
 
 ## Usage
-1. **Run the Daemon**:
+1. **Run the Program**:
    ```bash
-   python nsgtt_daemon.py
+   python nsgtt.py
    ```
    - The script initializes the database (`nsgtt.db`), detects the userdata ID, and starts monitoring.
    - Console output:
@@ -77,18 +76,82 @@
 
 2. **View Statistics**:
    ```bash
-   python nsgtt_daemon.py --show
+   python nsgtt.py --show
    ```
    - Displays a table of all tracked games with total playtime and play count.
 
-3. **Stop the Daemon**:
+3. **Stop the Program**:
    - Press `Ctrl+C` to stop monitoring. The console will show "Monitor stopped by user."
+
+## Running as a Windows Service with NSSM
+To run NSGTT as a background service on Windows, use NSSM (Non-Sucking Service Manager).
+
+1. **Install NSSM**:
+   - Download NSSM from [https://nssm.cc/download](https://nssm.cc/download).
+   - Extract and place `nssm.exe` in a directory (e.g., `C:\Program Files\nssm`).
+
+2. **Prepare the Script**:
+   - Place `nsgtt.py` in a stable location (e.g., `C:\Scripts\nsgtt.py`).
+   - Optionally, convert to an executable with `pyinstaller`:
+     ```bash
+     pip install pyinstaller
+     pyinstaller --onefile nsgtt.py
+     ```
+     This creates `nsgtt.exe` in the `dist` folder.
+
+3. **Install the Service**:
+   - Open Command Prompt as Administrator.
+   - Install the service:
+     ```bash
+     nssm install NSGTT "C:\Python39\python.exe" "C:\Scripts\nsgtt.py"
+     ```
+     Replace paths with your Python interpreter and script locations. If using the executable:
+     ```bash
+     nssm install NSGTT "C:\Scripts\dist\nsgtt.exe"
+     ```
+
+4. **Configure the Service**:
+   - Edit settings with:
+     ```bash
+     nssm edit NSGTT
+     ```
+   - In the NSSM GUI:
+     - **Application tab**: Verify the path and arguments.
+     - **Details tab**: Set display name to "Non-Steam Game Time Tracker".
+     - **Log on tab**: Use "Local System account" or a specific user with Steam directory access.
+     - **I/O tab**: Optionally set output to `C:\Logs\nsgtt.log`.
+     - Save changes.
+
+5. **Start the Service**:
+   - Start the service:
+     ```bash
+     nssm start NSGTT
+     ```
+   - Or use Windows Services (`services.msc`), find "Non-Steam Game Time Tracker", and start it.
+
+6. **Manage the Service**:
+   - Check status:
+     ```bash
+     nssm status NSGTT
+     ```
+   - Stop the service:
+     ```bash
+     nssm stop NSGTT
+     ```
+   - Remove the service:
+     ```bash
+     nssm remove NSGTT confirm
+     ```
+
+7. **Verify Operation**:
+   - Check the log file (if configured) or `nsgtt.db` for updates.
+   - Ensure Steam notes are updated in `STEAM_PATH/userdata/USERDATA_ID/NOTES_APPID/remote`.
 
 ## Console Output
 With `DEBUG: false`, the console is kept clean:
 - **Startup**:
   ```
-  ===== [ NSGTT - Non Steam Game Time Tracker Daemon ] =====
+  ===== [ NSGTT - Non Steam Game Time Tracker ] =====
   Initializing database at: E:\Arquivos\Ferramentas\NSGTT\nsgtt.db
   Database initialized successfully.
   Using USERDATA_ID from config: 54808062
@@ -151,20 +214,12 @@ With `DEBUG: true`, additional verbose messages appear (e.g., "Retrieving data f
   - Verify `NOTES_APPID` and `USERDATA_ID` in `config.json`.
   - Run as administrator if permission errors occur:
     ```bash
-    python nsgtt_daemon.py
+    python nsgtt.py
     ```
 - **Console Clutter**:
   - Ensure `DEBUG: false` for minimal output.
   - Confirm you're on Windows (uses `cls` for clearing).
 
-## Changelog (v2.0)
-Compared to the original version:
-- **Fixed Crash on Termination**: Robust exception handling ensures the monitoring loop continues after process termination.
-- **Optimized `shortcuts.vdf` Loading**: Caches file and reloads only when modified, reducing I/O and console spam.
-- **Improved Steam Note Handling**: Creates `remote` directory proactively and logs errors.
-- **Reduced Console Clutter**: Clears console with `cls` and updates status in place with `\r`.
-- **Added Debug Toggle**: `DEBUG` flag in `config.json` controls verbose output.
-- **Enhanced UX**: Color-coded, minimal output with clear event messages.
 
 ## Contributing
 - Fork the repository and submit pull requests for bug fixes or features.
