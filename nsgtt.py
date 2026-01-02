@@ -56,7 +56,7 @@ DB_PATH = os.path.join(get_base_path(), "nsgtt.db")
 # Conditional debug print
 def debug_print(message):
     if DEBUG:
-        print(f"{Fore.CYAN}{message}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}[DEBUG] {message}{Style.RESET_ALL}")
 
 # Get userdata folder ID
 def get_userdata_id():
@@ -165,35 +165,6 @@ def display_stats():
     except sqlite3.Error as e:
         print(f"{Fore.RED}Error reading database: {str(e)}{Style.RESET_ALL}")
 
-# Get game name from shortcuts.vdf
-def get_game_name_from_shortcuts(executable_path, userdata_id):
-    if not userdata_id:
-        print(f"{Fore.RED}No userdata ID provided. Using executable name.{Style.RESET_ALL}")
-        return os.path.splitext(os.path.basename(executable_path))[0]
-
-    shortcuts_path = os.path.join(STEAM_PATH, "userdata", userdata_id, "config", "shortcuts.vdf")
-    debug_print(f"Attempting to read shortcuts.vdf at: {shortcuts_path}")
-    try:
-        with open(shortcuts_path, 'rb') as f:
-            data = vdf.binary_load(f)
-        shortcuts = data.get('shortcuts', {})
-        input_path = os.path.normpath(executable_path).lower()
-        for idx, shortcut in shortcuts.items():
-            shortcut_exe = shortcut.get('Exe', '').strip('"')
-            appname = shortcut.get('AppName', os.path.splitext(os.path.basename(shortcut_exe))[0])
-            shortcut_exe_normalized = os.path.normpath(shortcut_exe).lower()
-            if shortcut_exe_normalized == input_path:
-                debug_print(f"Found game in shortcuts.vdf: {appname}")
-                return appname
-        debug_print(f"Game not found in shortcuts.vdf. Using executable name.")
-        return os.path.splitext(os.path.basename(executable_path))[0]
-    except FileNotFoundError:
-        print(f"{Fore.RED}shortcuts.vdf not found at {shortcuts_path}. Using executable name.{Style.RESET_ALL}")
-        return os.path.splitext(os.path.basename(executable_path))[0]
-    except Exception as e:
-        print(f"{Fore.RED}Error reading shortcuts.vdf: {str(e)}. Using executable name.{Style.RESET_ALL}")
-        return os.path.splitext(os.path.basename(executable_path))[0]
-
 # Clean game name for note filename
 def clean_game_name_for_note(game_name):
     cleaned = re.sub(r'[^a-zA-Z0-9]', '_', game_name.strip())
@@ -230,13 +201,13 @@ def update_steam_note(steam_note_path, game_name, time_played, count):
         "content": f"""
 📅 Last played: {last_played}                 
 ⏱️ Recorded time: {formatted_time_played}       
-🔢 Times played: {count}                       
+🔢 Times played: {count}                      
 """,
         "time_modified": int(time.time())
     }
 
-    if not steam_data["notes"]:
-        steam_data["notes"].append(note)
+    if not steam_data.get("notes"):
+        steam_data["notes"] = [note]
     else:
         steam_data["notes"][0] = note
 
@@ -244,7 +215,7 @@ def update_steam_note(steam_note_path, game_name, time_played, count):
     try:
         with open(steam_note_path, 'w', encoding='utf-8') as f:
             json.dump(steam_data, f, indent=4)
-        debug_print(f"Steam Note updated/created successfully at {steam_note_path}")
+        debug_print(f"Steam Note updated successfully at {steam_note_path}")
     except Exception as e:
         print(f"{Fore.RED}Error saving Steam Note: {str(e)}{Style.RESET_ALL}")
 
@@ -252,7 +223,7 @@ def update_steam_note(steam_note_path, game_name, time_played, count):
 def monitor_processes(userdata_id):
     print(f"{Fore.GREEN}Starting process monitor...{Style.RESET_ALL}")
     shortcuts_path = os.path.join(STEAM_PATH, "userdata", userdata_id, "config", "shortcuts.vdf")
-    tracked_processes = {}  # Dictionary to store {pid: {exe_path, game_name, start_time, steam_note_path}}
+    tracked_processes = {}  
     last_shortcuts_mtime = 0
     shortcuts = {}
 
@@ -265,14 +236,16 @@ def monitor_processes(userdata_id):
                 current_mtime = os.path.getmtime(shortcuts_path)
                 if current_mtime > last_shortcuts_mtime:
                     print(f"{Fore.CYAN}Reloading shortcuts.vdf (modified at {time.ctime(current_mtime)}){Style.RESET_ALL}")
-                    with open(shortcuts_path, 'rb') as f:
-                        data = vdf.binary_load(f)
-                    shortcuts = data.get('shortcuts', {})
-                    last_shortcuts_mtime = current_mtime
-                    debug_print(f"Loaded {len(shortcuts)} shortcuts from {shortcuts_path}")
+                    try:
+                        with open(shortcuts_path, 'rb') as f:
+                            data = vdf.binary_load(f)
+                        shortcuts = data.get('shortcuts', {})
+                        last_shortcuts_mtime = current_mtime
+                        debug_print(f"Loaded {len(shortcuts)} shortcuts.")
+                    except Exception as e:
+                        print(f"{Fore.RED}Failed to parse shortcuts.vdf: {e}{Style.RESET_ALL}")
             else:
                 shortcuts = {}
-                print(f"{Fore.YELLOW}shortcuts.vdf not found at {shortcuts_path}{Style.RESET_ALL}")
 
             # Get current processes
             current_pids = set()
@@ -281,67 +254,86 @@ def monitor_processes(userdata_id):
                     exe_path = proc.info['exe']
                     if not exe_path or not exe_path.lower().endswith('.exe'):
                         continue
-                    current_pids.add(proc.info['pid'])
+                    
+                    pid = proc.info['pid']
+                    current_pids.add(pid)
 
                     # Check if process matches a shortcut
-                    for idx, shortcut in shortcuts.items():
-                        shortcut_exe = shortcut.get('Exe', '').strip('"')
-                        appname = shortcut.get('AppName', os.path.splitext(os.path.basename(shortcut_exe))[0])
-                        shortcut_exe_normalized = os.path.normpath(shortcut_exe).lower()
-                        if os.path.normpath(exe_path).lower() == shortcut_exe_normalized and proc.info['pid'] not in tracked_processes:
-                            steam_note_path = os.path.join(STEAM_PATH, "userdata", userdata_id, NOTES_APPID, "remote", clean_game_name_for_note(appname))
-                            tracked_processes[proc.info['pid']] = {
-                                'exe_path': exe_path,
-                                'game_name': appname,
-                                'start_time': time.time(),
-                                'steam_note_path': steam_note_path
-                            }
-                            elapsed_time, count = get_game_data(appname)
-                            os.system('cls')
-                            print(f"{Fore.GREEN}Started tracking {appname} (PID: {proc.info['pid']}, Time: {format_time(elapsed_time)}, Count: {count}){Style.RESET_ALL}")
-                            break
+                    if pid not in tracked_processes:
+                        for idx, shortcut in shortcuts.items():
+                            shortcut_exe = shortcut.get('Exe', '').strip('"')
+                            shortcut_exe_normalized = os.path.normpath(shortcut_exe).lower()
+                            
+                            if os.path.normpath(exe_path).lower() == shortcut_exe_normalized:
+                                appname = shortcut.get('AppName', os.path.splitext(os.path.basename(shortcut_exe))[0])
+                                launch_options = shortcut.get('LaunchOptions', '')
+
+                                # --- NOVA LÓGICA DE FILTRAGEM PARA LAUNCHERS ---
+                                is_heroic = "heroic" in exe_path.lower()
+                                
+                                if is_heroic:
+                                    # Se for Heroic, verificamos se o ID do app está NESTE atalho específico
+                                    match = re.search(r'appName=([^&"\s]+)', launch_options)
+                                    if match:
+                                        game_id = match.group(1)
+                                        # Se o atalho atual NÃO for o do jogo que está rodando, pula para o próximo
+                                        # O Heroic passa o appID via linha de comando para o processo filho
+                                        # Vamos verificar se o ID do app está nos argumentos do PROCESSO REAL
+                                        try:
+                                            proc_args = " ".join(proc.cmdline())
+                                            if game_id not in proc_args:
+                                                continue # Não é este atalho, tenta o próximo no loop
+                                        except:
+                                            pass
+                                        
+                                        if appname.lower() == "heroic":
+                                            appname = f"Heroic_{game_id[:8]}"
+                                # ----------------------------------------------
+
+                                steam_note_path = os.path.join(STEAM_PATH, "userdata", userdata_id, NOTES_APPID, "remote", clean_game_name_for_note(appname))
+                                
+                                tracked_processes[pid] = {
+                                    'exe_path': exe_path,
+                                    'game_name': appname,
+                                    'start_time': time.time(),
+                                    'steam_note_path': steam_note_path
+                                }
+                                
+                                elapsed_time, count = get_game_data(appname)
+                                os.system('cls')
+                                print(f"{Fore.GREEN}Started tracking {appname} (PID: {pid}, Time: {format_time(elapsed_time)}, Count: {count}){Style.RESET_ALL}")
+                                break
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
 
             # Check for terminated processes
             terminated_pids = set(tracked_processes.keys()) - current_pids
-            for pid in terminated_pids:
+            for pid in list(terminated_pids):
                 debug_print(f"Processing termination for PID {pid}")
                 try:
-                    proc_info = tracked_processes.get(pid)
+                    proc_info = tracked_processes.pop(pid, None)
                     if not proc_info:
-                        print(f"{Fore.RED}No process info found for PID {pid}{Style.RESET_ALL}")
                         continue
-                    debug_print(f"Removing PID {pid} from tracked processes")
-                    tracked_processes.pop(pid, None)
+                    
                     elapsed_time, count = get_game_data(proc_info['game_name'])
                     session_time = time.time() - proc_info['start_time']
                     elapsed_time += session_time
                     count += 1
+                    
                     os.system('cls')
                     print(f"{Fore.YELLOW}Stopped tracking {proc_info['game_name']} (PID: {pid}, Session: {format_time(session_time)}, Total: {format_time(elapsed_time)}, Count: {count}){Style.RESET_ALL}")
-                    try:
-                        save_game_data(proc_info['game_name'], elapsed_time, count)
-                    except Exception as e:
-                        print(f"{Fore.RED}Failed to save game data for {proc_info['game_name']}: {str(e)}{Style.RESET_ALL}")
-                    try:
-                        update_steam_note(proc_info['steam_note_path'], proc_info['game_name'], elapsed_time, count)
-                    except Exception as e:
-                        print(f"{Fore.RED}Failed to update Steam note for {proc_info['game_name']}: {str(e)}{Style.RESET_ALL}")
+                    
+                    save_game_data(proc_info['game_name'], elapsed_time, count)
+                    update_steam_note(proc_info['steam_note_path'], proc_info['game_name'], elapsed_time, count)
                 except Exception as e:
-                    print(f"{Fore.RED}Error processing termination for PID {pid}: {str(e)}{Style.RESET_ALL}")
-                    continue
+                    print(f"{Fore.RED}Error on termination for PID {pid}: {str(e)}{Style.RESET_ALL}")
 
-            # Update status
-            #os.system('cls')
-            #print(f"{Fore.CYAN}Monitoring... ({len(tracked_processes)} processes tracked, iteration {loop_count}){Style.RESET_ALL}", end='\r')
             time.sleep(CHECK_INTERVAL)
         except KeyboardInterrupt:
             os.system('cls')
             print(f"{Fore.YELLOW}Monitor stopped by user.{Style.RESET_ALL}")
             break
         except Exception as e:
-            os.system('cls')
             print(f"{Fore.RED}Error in monitor loop: {str(e)}{Style.RESET_ALL}")
             time.sleep(CHECK_INTERVAL)
 
